@@ -1,0 +1,5 @@
+numpy>=1.24
+cupy-cuda12x
+pyopencl
+py-cpuinfo
+rich>=13.0

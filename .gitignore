@@ -1,0 +1,22 @@
+# Bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated reports
+reports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+dist/
+build/
