@@ -403,12 +403,12 @@ def print_results_summary(results):
     if cpu_results:
         print("  === CPU 结果汇总 ===")
         for r in cpu_results:
-            print(f"  {r.case_name:12s} ({r.precision:4s})  {r.time_seconds:.4f}s  {r.tflops:.4f} TFLOPS")
+            print(f"  {r.case_name:12s} ({r.precision:4s})  {r.time_seconds:.4f}s  {r.tflops:.4f} TFLOPS  {r.avg_power_watts:.2f}W  {r.efficiency_gflops_per_watt:.2f} GFLOPS/W")
 
     if gpu_results:
         print("\n  === GPU 结果汇总 ===")
         for r in gpu_results:
-            print(f"  {r.case_name:12s} ({r.precision:4s})  {r.time_seconds:.4f}s  {r.tflops:.4f} TFLOPS")
+            print(f"  {r.case_name:12s} ({r.precision:4s})  {r.time_seconds:.4f}s  {r.tflops:.4f} TFLOPS  {r.avg_power_watts:.2f}W  {r.efficiency_gflops_per_watt:.2f} GFLOPS/W")
 
     if cpu_results and gpu_results:
         print("\n  === CPU vs GPU 加速比 ===")
@@ -419,7 +419,8 @@ def print_results_summary(results):
             gpu_r = gpu_map.get(key)
             if gpu_r and cpu_r.tflops > 0:
                 speedup = gpu_r.tflops / cpu_r.tflops
-                print(f"  {cpu_r.case_name:12s} ({cpu_r.precision:4s})  {speedup:.1f}x")
+                efficiency_up = gpu_r.efficiency_gflops_per_watt / cpu_r.efficiency_gflops_per_watt if cpu_r.efficiency_gflops_per_watt > 0 else 0
+                print(f"  {cpu_r.case_name:12s} ({cpu_r.precision:4s})  性能:{speedup:.1f}x  能效:{efficiency_up:.1f}x")
 
 
 if __name__ == "__main__":

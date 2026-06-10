@@ -78,13 +78,14 @@ class ReportGenerator:
             return []
 
         lines = ["## CPU 测试结果", ""]
-        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 备注 |")
-        lines.append("|------|------|---------|----------|--------|--------|------|")
+        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
+        lines.append("|------|------|---------|----------|--------|----------|----------|------------------|------|")
         for r in cpu_results:
             note = r.note if r.note else "-"
             lines.append(
                 f"| {r.case_name} | {r.precision} | {r.problem_size} | "
-                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | {note} |"
+                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.avg_power_watts:.2f} | "
+                f"{r.energy_joules:.2f} | {r.efficiency_gflops_per_watt:.2f} | {note} |"
             )
         lines.append("")
         return lines
@@ -95,13 +96,14 @@ class ReportGenerator:
             return []
 
         lines = ["## GPU 测试结果", ""]
-        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 备注 |")
-        lines.append("|------|------|---------|----------|--------|--------|------|")
+        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
+        lines.append("|------|------|---------|----------|--------|----------|----------|------------------|------|")
         for r in gpu_results:
             note = r.note if r.note else "-"
             lines.append(
                 f"| {r.case_name} | {r.precision} | {r.problem_size} | "
-                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | {note} |"
+                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.avg_power_watts:.2f} | "
+                f"{r.energy_joules:.2f} | {r.efficiency_gflops_per_watt:.2f} | {note} |"
             )
         lines.append("")
         return lines
@@ -114,16 +116,20 @@ class ReportGenerator:
             return []
 
         lines = ["## CPU vs GPU 对比", ""]
-        lines.append("| 用例 | 精度 | CPU TFLOPS | GPU TFLOPS | 加速比 |")
-        lines.append("|------|------|-----------|-----------|--------|")
+        lines.append("| 用例 | 精度 | CPU TFLOPS | GPU TFLOPS | 加速比 | CPU功耗 (W) | GPU功耗 (W) | CPU能效 | GPU能效 | 能效提升 |")
+        lines.append("|------|------|-----------|-----------|--------|------------|------------|--------|--------|----------|")
         for key in sorted(cpu_results.keys()):
             cpu = cpu_results[key]
             gpu = gpu_results.get(key)
             if gpu and cpu.tflops > 0:
                 speedup = gpu.tflops / cpu.tflops
+                efficiency_improvement = gpu.efficiency_gflops_per_watt / cpu.efficiency_gflops_per_watt if cpu.efficiency_gflops_per_watt > 0 else 0
                 lines.append(
                     f"| {cpu.case_name} | {cpu.precision} | "
-                    f"{cpu.tflops:.4f} | {gpu.tflops:.4f} | {speedup:.1f}x |"
+                    f"{cpu.tflops:.4f} | {gpu.tflops:.4f} | {speedup:.1f}x | "
+                    f"{cpu.avg_power_watts:.2f} | {gpu.avg_power_watts:.2f} | "
+                    f"{cpu.efficiency_gflops_per_watt:.2f} | {gpu.efficiency_gflops_per_watt:.2f} | "
+                    f"{efficiency_improvement:.1f}x |"
                 )
         lines.append("")
         return lines

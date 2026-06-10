@@ -102,10 +102,14 @@ class Runner:
 
         self.gpu._current_precision = precision
 
-        elapsed = case.run_gpu(size, precision, self.gpu)
+        from utils.power_monitor import PowerMonitorContext
+        with PowerMonitorContext(sample_interval=0.05) as monitor:
+            elapsed = case.run_gpu(size, precision, self.gpu)
+        _, gpu_power = monitor.stop()
 
         flops = case.get_flops(size)
         tflops = (flops / elapsed) / 1e12 if elapsed > 0 else 0.0
+        energy_joules = gpu_power * elapsed
 
         return CaseResult(
             case_name=case.name,
@@ -117,6 +121,8 @@ class Runner:
             tflops=tflops,
             iterations=1,
             note=note,
+            avg_power_watts=gpu_power,
+            energy_joules=energy_joules,
         )
 
     def _get_cases(self):

@@ -51,10 +51,18 @@ class CaseResult:
     tflops: float
     iterations: int
     note: str = ""
+    avg_power_watts: float = 0.0
+    energy_joules: float = 0.0
 
     @property
     def gflops(self) -> float:
         return self.tflops * 1000.0
+
+    @property
+    def efficiency_gflops_per_watt(self) -> float:
+        if self.avg_power_watts > 0:
+            return self.gflops / self.avg_power_watts
+        return 0.0
 
 
 @dataclass

@@ -12,10 +12,14 @@ class CpuBackend:
         if precision in (Precision.FP16, Precision.BF16):
             note = f"{precision.value}(float32 simulate)"
 
-        elapsed = case.run_cpu(size, precision)
+        from utils.power_monitor import PowerMonitorContext
+        with PowerMonitorContext(sample_interval=0.05) as monitor:
+            elapsed = case.run_cpu(size, precision)
+        cpu_power, _ = monitor.stop()
 
         flops = case.get_flops(size)
         tflops = (flops / elapsed) / 1e12 if elapsed > 0 else 0.0
+        energy_joules = cpu_power * elapsed
 
         return CaseResult(
             case_name=case.name,
@@ -27,6 +31,8 @@ class CpuBackend:
             tflops=tflops,
             iterations=1,
             note=note,
+            avg_power_watts=cpu_power,
+            energy_joules=energy_joules,
         )
 
     @staticmethod
