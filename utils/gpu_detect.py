@@ -1,5 +1,8 @@
+import warnings
 from typing import List, Tuple
 from config import GpuBackendType
+
+warnings.filterwarnings("ignore", message="CUDA path could not be detected")
 
 
 class GpuInfo:

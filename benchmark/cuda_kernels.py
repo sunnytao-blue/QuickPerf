@@ -75,7 +75,14 @@ class CudaBackend(GpuBackend):
         return y
 
     def sum(self, arr):
-        return self.cp.sum(arr)
+        if not hasattr(self, '_sum_kernels'):
+            self._sum_kernels = {}
+        dtype_key = str(arr.dtype)
+        if dtype_key not in self._sum_kernels:
+            self._sum_kernels[dtype_key] = self.cp.ReductionKernel(
+                f'{dtype_key} x', f'{dtype_key} out',
+                'x', 'a + b', 'out = a', '0', 'sum_reduce')
+        return self._sum_kernels[dtype_key](arr)
 
     def dispose(self):
         self.cp.get_default_memory_pool().free_all_blocks()
