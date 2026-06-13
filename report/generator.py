@@ -95,6 +95,8 @@ class ReportGenerator:
             targets.append("GPU")
         if TestTarget.BOTH in self.config.targets:
             targets = ["CPU", "GPU"]
+        if TestTarget.GPU_VS_GPU in self.config.targets:
+            targets = ["GPU vs GPU"]
         lines.append(f"- **测试目标**：[{', '.join(targets)}]")
         lines.append(f"- **测试用例**：{', '.join(self.config.cases)}")
         lines.append("")
@@ -162,6 +164,17 @@ class ReportGenerator:
 
     def _build_gpu_precision_comparison(self):
         gpu_results = [r for r in self.results if r.target == "GPU"]
+        if not gpu_results:
+            return []
+
+        gpu_names = sorted(set(r.gpu_name for r in gpu_results if r.gpu_name))
+        if len(gpu_names) > 1:
+            lines = []
+            for name in gpu_names:
+                subset = [r for r in gpu_results if r.gpu_name == name]
+                lines.extend(self._build_single_precision_comparison(subset, f"GPU ({name})"))
+            return lines
+
         return self._build_single_precision_comparison(gpu_results, "GPU")
 
     def _build_gpu_vs_gpu_comparison(self):
