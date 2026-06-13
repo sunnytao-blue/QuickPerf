@@ -463,10 +463,12 @@ def _print_single_precision_comparison(results, target_label):
         return
     cases = sorted(set(r.case_name for r in results))
 
+    col_w = max(max(len(p) for p in precisions), 8)
+
     print(f"\n  === {target_label} 跨精度对比 (TFLOPS) ===")
     row = f"  {'用例':12s}"
     for prec in precisions:
-        row += f"  {prec:>7s}"
+        row += f"  {prec:>{col_w}s}"
     print(row)
 
     for case in cases:
@@ -474,9 +476,9 @@ def _print_single_precision_comparison(results, target_label):
         for prec in precisions:
             r = next((x for x in results if x.case_name == case and x.precision == prec), None)
             if r and r.tflops > 0:
-                row += f"  {r.tflops:6.4f}"
+                row += f"  {r.tflops:{col_w}.4f}"
             else:
-                row += f"  {'N/A':>7s}"
+                row += f"  {'N/A':>{col_w}s}"
         print(row)
 
 
@@ -489,10 +491,12 @@ def print_precision_comparison(cpu_results, gpu_results):
 
     cases = sorted(set(r.case_name for r in cpu_results))
 
+    col_w = max(max(len(p) for p in precisions), 8)
+
     print("\n  === 跨精度对比 (GPU vs CPU 加速比) ===")
     header = f"  {'用例':12s}"
     for prec in precisions:
-        header += f"  {prec:>6s}"
+        header += f"  {prec:>{col_w}s}"
     print(header)
 
     for case in cases:
@@ -502,9 +506,9 @@ def print_precision_comparison(cpu_results, gpu_results):
             gpu_r = next((r for r in gpu_results if r.case_name == case and r.precision == prec), None)
             if cpu_r and gpu_r and cpu_r.tflops > 0:
                 speedup = gpu_r.tflops / cpu_r.tflops
-                row += f"  {speedup:5.1f}x"
+                row += f"  {speedup:{col_w - 1}.1f}x"
             else:
-                row += f"  {'N/A':>6s}"
+                row += f"  {'N/A':>{col_w}s}"
         print(row)
 
 
