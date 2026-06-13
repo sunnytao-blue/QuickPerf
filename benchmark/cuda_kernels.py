@@ -65,12 +65,37 @@ class CudaBackend(GpuBackend):
 
     def saxpy(self, alpha, x, y):
         self.cp.get_default_memory_pool().free_all_blocks()
-        y[:] = alpha * x + y
+        try:
+            y[:] = alpha * x + y
+            return y
+        except Exception:
+            pass
+
+        if not hasattr(self, '_saxpy_kernels'):
+            self._saxpy_kernels = {}
+        dtype_key = str(x.dtype)
+        if dtype_key not in self._saxpy_kernels:
+            self._saxpy_kernels[dtype_key] = self.cp.ElementwiseKernel(
+                f'{dtype_key} x, {dtype_key} alpha', f'{dtype_key} y',
+                'y = alpha * x + y', 'saxpy')
+        self._saxpy_kernels[dtype_key](x, self.cp.dtype(dtype_key).type(alpha), y)
         return y
 
     def sum(self, arr):
         self.cp.get_default_memory_pool().free_all_blocks()
-        return self.cp.sum(arr)
+        try:
+            return self.cp.sum(arr)
+        except Exception:
+            pass
+
+        if not hasattr(self, '_sum_kernels'):
+            self._sum_kernels = {}
+        dtype_key = str(arr.dtype)
+        if dtype_key not in self._sum_kernels:
+            self._sum_kernels[dtype_key] = self.cp.ReductionKernel(
+                f'{dtype_key} x', f'{dtype_key} out',
+                'x', 'a + b', 'out = a', '0', 'sum_reduce')
+        return self._sum_kernels[dtype_key](arr)
 
     def dispose(self):
         self.cp.get_default_memory_pool().free_all_blocks()

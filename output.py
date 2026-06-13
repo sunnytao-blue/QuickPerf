@@ -177,8 +177,6 @@ def _print_gpu_vs_gpu_speedup(gpu_results):
                     speedups.append(f"{r.tflops / base.tflops:.1f}x")
                 else:
                     speedups.append("N/A")
-                else:
-                    speedups.append(f"{name}/N/A")
             row += f"  {', '.join(speedups)}"
             print(row)
 
