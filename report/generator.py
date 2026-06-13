@@ -207,13 +207,21 @@ class ReportGenerator:
         return lines
 
     def _build_comparison(self):
-        cpu_results = {f"{r.case_name}_{r.precision}": r for r in self.results if r.target == "CPU"}
-        gpu_results = {f"{r.case_name}_{r.precision}": r for r in self.results if r.target == "GPU"}
-
-        if not cpu_results or not gpu_results:
+        cpu_results_all = [r for r in self.results if r.target == "CPU"]
+        gpu_results_all = [r for r in self.results if r.target == "GPU"]
+        if not cpu_results_all or not gpu_results_all:
             return []
 
-        lines = ["## CPU vs GPU 对比", ""]
+        gpu_names = sorted(set(r.gpu_name for r in gpu_results_all if r.gpu_name))
+
+        if len(gpu_names) >= 2:
+            return self._build_three_way_comparison(cpu_results_all, gpu_results_all, gpu_names)
+
+        gpu_label = gpu_names[0] if gpu_names else "GPU"
+        cpu_results = {f"{r.case_name}_{r.precision}": r for r in cpu_results_all}
+        gpu_results = {f"{r.case_name}_{r.precision}": r for r in gpu_results_all}
+
+        lines = [f"## CPU vs {gpu_label} 对比", ""]
         lines.append("| 用例 | 精度 | CPU TFLOPS | GPU TFLOPS | 加速比 | CPU功耗 (W) | GPU功耗 (W) | CPU能效 | GPU能效 | 能效提升 |")
         lines.append("|------|------|-----------|-----------|--------|------------|------------|--------|--------|----------|")
         for key in sorted(cpu_results.keys()):
@@ -233,6 +241,45 @@ class ReportGenerator:
                     f"{eff_str} |"
                 )
         lines.append("")
+        return lines
+
+    def _build_three_way_comparison(self, cpu_results_all, gpu_results_all, gpu_names):
+        cases = sorted(set(r.case_name for r in cpu_results_all))
+        precisions = sorted(set(r.precision for r in cpu_results_all), key=precision_sort_key)
+
+        lines = ["## CPU + 多GPU 对比 (TFLOPS)", ""]
+
+        for prec in precisions:
+            lines.append(f"### 精度: {prec}")
+            lines.append("")
+            header = "| 用例 | CPU |"
+            sep = "|------|-----|"
+            for name in gpu_names:
+                header += f" {name} |"
+                sep += "--------|"
+            header += " 加速比 |"
+            sep += "--------|"
+            lines.append(header)
+            lines.append(sep)
+
+            for case in cases:
+                cpu_r = next((r for r in cpu_results_all if r.case_name == case and r.precision == prec), None)
+                if not cpu_r or cpu_r.tflops <= 0:
+                    continue
+                cpu_val = cpu_r.tflops
+                row = f"| {case} | {cpu_val:.4f} |"
+                speedups = []
+                for name in gpu_names:
+                    gpu_r = next((r for r in gpu_results_all if r.case_name == case and r.precision == prec and r.gpu_name == name), None)
+                    if gpu_r and gpu_r.tflops > 0:
+                        row += f" {gpu_r.tflops:.4f} |"
+                        speedups.append(f"{gpu_r.tflops / cpu_val:.1f}x")
+                    else:
+                        row += " N/A |"
+                        speedups.append("N/A")
+                row += f" {', '.join(speedups)} |"
+                lines.append(row)
+            lines.append("")
         return lines
 
     def _build_precision_comparison(self):

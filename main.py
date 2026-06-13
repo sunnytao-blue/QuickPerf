@@ -532,20 +532,26 @@ def print_results_summary(results):
         _print_gpu_vs_gpu_comparison(gpu_results)
 
     if cpu_results and gpu_results:
-        print("\n  === CPU vs GPU 加速比 ===")
-        cpu_map = {f"{r.case_name}_{r.precision}": r for r in cpu_results}
-        gpu_map = {f"{r.case_name}_{r.precision}": r for r in gpu_results}
-        for key in sorted(cpu_map.keys()):
-            cpu_r = cpu_map[key]
-            gpu_r = gpu_map.get(key)
-            if gpu_r and cpu_r.tflops > 0:
-                speedup = gpu_r.tflops / cpu_r.tflops
-                if cpu_r.efficiency_gflops_per_watt > 0 and gpu_r.efficiency_gflops_per_watt > 0:
-                    efficiency_up = gpu_r.efficiency_gflops_per_watt / cpu_r.efficiency_gflops_per_watt
-                    eff_str = f"能效:{efficiency_up:.1f}x"
-                else:
-                    eff_str = "能效:N/A"
-                print(f"  {cpu_r.case_name:12s} ({cpu_r.precision:4s})  性能:{speedup:.1f}x  {eff_str}")
+        gpu_names = sorted(set(r.gpu_name for r in gpu_results if r.gpu_name))
+
+        if len(gpu_names) >= 2:
+            _print_three_way_comparison(cpu_results, gpu_results, gpu_names)
+        else:
+            gpu_label = gpu_names[0] if gpu_names else "GPU"
+            print(f"\n  === CPU vs {gpu_label} 加速比 ===")
+            cpu_map = {f"{r.case_name}_{r.precision}": r for r in cpu_results}
+            gpu_map = {f"{r.case_name}_{r.precision}": r for r in gpu_results}
+            for key in sorted(cpu_map.keys()):
+                cpu_r = cpu_map[key]
+                gpu_r = gpu_map.get(key)
+                if gpu_r and cpu_r.tflops > 0:
+                    speedup = gpu_r.tflops / cpu_r.tflops
+                    if cpu_r.efficiency_gflops_per_watt > 0 and gpu_r.efficiency_gflops_per_watt > 0:
+                        efficiency_up = gpu_r.efficiency_gflops_per_watt / cpu_r.efficiency_gflops_per_watt
+                        eff_str = f"能效:{efficiency_up:.1f}x"
+                    else:
+                        eff_str = "能效:N/A"
+                    print(f"  {cpu_r.case_name:12s} ({cpu_r.precision:4s})  性能:{speedup:.1f}x  {eff_str}")
 
         print_precision_comparison(cpu_results, gpu_results)
 
@@ -601,6 +607,38 @@ def _print_gpu_vs_gpu_comparison(gpu_results):
                     row += f"  {r.tflops:{gpu_label_width}.4f}"
                 else:
                     row += f"  {'N/A':>{gpu_label_width}s}"
+            print(row)
+
+
+def _print_three_way_comparison(cpu_results, gpu_results, gpu_names):
+    cases = sorted(set(r.case_name for r in cpu_results))
+    precisions = sorted(set(r.precision for r in cpu_results), key=precision_sort_key)
+    name_w = max(10, max(len(n) for n in gpu_names))
+
+    for prec in precisions:
+        print(f"\n  === CPU + 多GPU 对比 (TFLOPS) — {prec} ===")
+        header = f"  {'用例':12s}  {'CPU':>8s}"
+        for name in gpu_names:
+            header += f"  {name:>{name_w}s}"
+        header += f"  {'加速比':>8s}"
+        print(header)
+
+        for case in cases:
+            cpu_r = next((r for r in cpu_results if r.case_name == case and r.precision == prec), None)
+            if not cpu_r or cpu_r.tflops <= 0:
+                continue
+            cpu_val = cpu_r.tflops
+            row = f"  {case:12s}  {cpu_val:8.4f}"
+            speedups = []
+            for name in gpu_names:
+                gpu_r = next((r for r in gpu_results if r.case_name == case and r.precision == prec and r.gpu_name == name), None)
+                if gpu_r and gpu_r.tflops > 0:
+                    row += f"  {gpu_r.tflops:{name_w}.4f}"
+                    speedups.append(f"{gpu_r.tflops / cpu_val:.1f}x")
+                else:
+                    row += f"  {'N/A':>{name_w}s}"
+                    speedups.append("N/A")
+            row += f"  {', '.join(speedups):>8s}"
             print(row)
 
 
