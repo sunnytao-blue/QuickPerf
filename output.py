@@ -174,7 +174,9 @@ def _print_gpu_vs_gpu_speedup(gpu_results):
             for name in other_names:
                 r = next((x for x in gpu_results if x.case_name == case and x.precision == prec and x.gpu_name == name), None)
                 if r and r.tflops > 0:
-                    speedups.append(f"{name}/{base_name}={r.tflops / base.tflops:.1f}x")
+                    speedups.append(f"{r.tflops / base.tflops:.1f}x")
+                else:
+                    speedups.append("N/A")
                 else:
                     speedups.append(f"{name}/N/A")
             row += f"  {', '.join(speedups)}"
