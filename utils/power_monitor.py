@@ -297,24 +297,3 @@ def measure_power_during(func, sample_interval: float = 0.1) -> Tuple[float, flo
     return elapsed, cpu_power, gpu_power
 
 
-if __name__ == "__main__":
-    print("Testing power monitor...")
-    monitor = PowerMonitor()
-    
-    print("\nSingle sample:")
-    sample = monitor.sample()
-    print(f"CPU Power: {sample.cpu_power_watts:.2f} W")
-    print(f"GPU Power: {sample.gpu_power_watts:.2f} W")
-
-    print("\nTesting with context manager (3 seconds)...")
-    with PowerMonitorContext(sample_interval=0.1) as pm:
-        time.sleep(1)
-        print("Doing work...")
-        import numpy as np
-        a = np.random.rand(2000, 2000)
-        for _ in range(5):
-            _ = a @ a
-        time.sleep(1)
-    cpu_avg, gpu_avg = pm.stop()
-    print(f"Average CPU Power: {cpu_avg:.2f} W")
-    print(f"Average GPU Power: {gpu_avg:.2f} W")
