@@ -58,6 +58,7 @@ class ReportGenerator:
         lines.extend(self._build_gpu_results())
         lines.extend(self._build_cpu_precision_comparison())
         lines.extend(self._build_gpu_precision_comparison())
+        lines.extend(self._build_gpu_vs_gpu_comparison())
         lines.extend(self._build_comparison())
         lines.extend(self._build_precision_comparison())
 
@@ -138,6 +139,40 @@ class ReportGenerator:
     def _build_gpu_precision_comparison(self):
         gpu_results = [r for r in self.results if r.target == "GPU"]
         return self._build_single_precision_comparison(gpu_results, "GPU")
+
+    def _build_gpu_vs_gpu_comparison(self):
+        gpu_results = [r for r in self.results if r.target == "GPU"]
+        gpu_names = sorted(set(r.gpu_name for r in gpu_results if r.gpu_name))
+        if len(gpu_names) < 2:
+            return []
+
+        cases = sorted(set(r.case_name for r in gpu_results))
+        precisions = sorted(set(r.precision for r in gpu_results), key=precision_sort_key)
+
+        lines = ["## 多GPU对比 (TFLOPS)", ""]
+
+        for prec in precisions:
+            lines.append(f"### 精度: {prec}")
+            lines.append("")
+            header = "| 用例 |"
+            sep = "|------|"
+            for name in gpu_names:
+                header += f" {name} |"
+                sep += "--------|"
+            lines.append(header)
+            lines.append(sep)
+
+            for case in cases:
+                row = f"| {case} |"
+                for name in gpu_names:
+                    r = next((x for x in gpu_results if x.case_name == case and x.precision == prec and x.gpu_name == name), None)
+                    if r and r.tflops > 0:
+                        row += f" {r.tflops:.4f} |"
+                    else:
+                        row += " N/A |"
+                lines.append(row)
+            lines.append("")
+        return lines
 
     @staticmethod
     def _build_single_precision_comparison(results, target_label):

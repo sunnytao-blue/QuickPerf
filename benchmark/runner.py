@@ -7,10 +7,10 @@ from benchmark.gpu_backend import GpuBackend
 
 
 class Runner:
-    def __init__(self, config: RunnerConfig, gpu_backend: GpuBackend = None):
+    def __init__(self, config: RunnerConfig, gpu_backends: List[GpuBackend] = None):
         self.config = config
         self.cpu = CpuBackend()
-        self.gpu = gpu_backend
+        self.gpu_backends = gpu_backends or []
 
     def run(self, progress_callback=None) -> List[CaseResult]:
         results = []
@@ -18,8 +18,8 @@ class Runner:
         total_tasks = 0
         if TestTarget.CPU in self.config.targets or TestTarget.BOTH in self.config.targets:
             total_tasks += len(self.config.cases) * len(self.config.precisions)
-        if (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets) and self.gpu:
-            total_tasks += len(self.config.cases) * len(self.config.precisions)
+        if (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets):
+            total_tasks += len(self.config.cases) * len(self.config.precisions) * len(self.gpu_backends)
 
         completed = 0
 
@@ -27,8 +27,10 @@ class Runner:
             results.extend(self._run_cpu_tests(progress_callback, total_tasks, completed))
             completed += len(self.config.cases) * len(self.config.precisions)
 
-        if (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets) and self.gpu:
-            results.extend(self._run_gpu_tests(progress_callback, total_tasks, completed))
+        if (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets):
+            for backend in self.gpu_backends:
+                results.extend(self._run_gpu_tests(backend, progress_callback, total_tasks, completed))
+                completed += len(self.config.cases) * len(self.config.precisions)
 
         return results
 
@@ -53,25 +55,26 @@ class Runner:
 
         return results
 
-    def _run_gpu_tests(self, progress_callback, total: int, completed: int) -> List[CaseResult]:
+    def _run_gpu_tests(self, backend: GpuBackend, progress_callback, total: int, completed: int) -> List[CaseResult]:
         results = []
         case_instances = self._get_cases()
+        gpu_label = backend.gpu_name or "GPU"
 
         for case in case_instances:
             for prec in self.config.precisions:
                 size = case.get_size(self.config.duration_mode, "GPU")
                 if progress_callback:
                     progress_callback(completed, total,
-                                      f"[GPU] {case.name:12s} ({prec.value:4s}) ... running")
+                                      f"[GPU] {case.name:12s} ({prec.value:4s}) ... running [{gpu_label}]")
 
                 try:
-                    result = self._run_gpu_case(case, size, prec)
+                    result = self._run_gpu_case(case, size, prec, backend)
                     results.append(result)
 
                     completed += 1
                     if progress_callback:
                         progress_callback(completed, total,
-                                          f"[GPU] {case.name:12s} ({prec.value:4s}) ... {result.time_seconds:.4f}s  {result.tflops:.4f} TFLOPS")
+                                          f"[GPU] {case.name:12s} ({prec.value:4s}) ... {result.time_seconds:.4f}s  {result.tflops:.4f} TFLOPS  [{gpu_label}]")
                 except Exception as e:
                     completed += 1
                     result = CaseResult(
@@ -84,27 +87,28 @@ class Runner:
                         tflops=0,
                         iterations=0,
                         note=f"SKIP: {e}",
+                        gpu_name=gpu_label,
                     )
                     results.append(result)
                     if progress_callback:
                         progress_callback(completed, total,
-                                          f"[GPU] {case.name:12s} ({prec.value:4s}) ... SKIP ({e})")
+                                          f"[GPU] {case.name:12s} ({prec.value:4s}) ... SKIP ({e}) [{gpu_label}]")
 
         return results
 
-    def _run_gpu_case(self, case, size: int, precision: Precision) -> CaseResult:
+    def _run_gpu_case(self, case, size: int, precision: Precision, backend: GpuBackend) -> CaseResult:
         note = ""
         if precision == Precision.FP16:
-            if self.gpu.backend_type.value == "OpenCL":
+            if backend.backend_type.value == "OpenCL":
                 note = "FP16(float32 simulate)"
         elif precision == Precision.BF16:
             note = "BF16(float32 simulate)"
 
-        self.gpu._current_precision = precision
+        backend._current_precision = precision
 
         from utils.power_monitor import PowerMonitorContext
         with PowerMonitorContext(sample_interval=0.05) as monitor:
-            elapsed = case.run_gpu(size, precision, self.gpu)
+            elapsed = case.run_gpu(size, precision, backend)
         _, gpu_power = monitor.stop()
 
         flops = case.get_flops(size)
@@ -123,6 +127,7 @@ class Runner:
             note=note,
             avg_power_watts=gpu_power,
             energy_joules=energy_joules,
+            gpu_name=backend.gpu_name,
         )
 
     def _get_cases(self):

@@ -81,6 +81,7 @@ class CaseResult:
     note: str = ""
     avg_power_watts: float = 0.0
     energy_joules: float = 0.0
+    gpu_name: str = ""
 
     @property
     def gflops(self) -> float:
@@ -109,3 +110,4 @@ class RunnerConfig:
     cases: List[str] = field(default_factory=list)
     precisions: List[Precision] = field(default_factory=list)
     duration_mode: DurationMode = DurationMode.QUICK
+    gpu_indices: List[int] = field(default_factory=list)
