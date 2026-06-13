@@ -57,6 +57,7 @@ class ReportGenerator:
         lines.extend(self._build_cpu_results())
         lines.extend(self._build_gpu_results())
         lines.extend(self._build_comparison())
+        lines.extend(self._build_precision_comparison())
 
         return "\n".join(lines)
 
@@ -154,5 +155,41 @@ class ReportGenerator:
                     f"{_fmt_efficiency(cpu.efficiency_gflops_per_watt)} | {_fmt_efficiency(gpu.efficiency_gflops_per_watt)} | "
                     f"{eff_str} |"
                 )
+        lines.append("")
+        return lines
+
+    def _build_precision_comparison(self):
+        cpu_results = [r for r in self.results if r.target == "CPU"]
+        gpu_results = [r for r in self.results if r.target == "GPU"]
+        if not cpu_results or not gpu_results:
+            return []
+
+        precisions = sorted(set(r.precision for r in cpu_results))
+        if len(precisions) < 2:
+            return []
+
+        cases = sorted(set(r.case_name for r in cpu_results))
+
+        lines = ["## 跨精度对比 (GPU vs CPU 加速比)", ""]
+        header = "| 用例 |"
+        sep = "|------|"
+        for prec in precisions:
+            header += f" {prec} |"
+            sep += "---------|"
+        lines.append(header)
+        lines.append(sep)
+
+        for case in cases:
+            row = f"| {case} |"
+            for prec in precisions:
+                cpu_r = next((r for r in cpu_results if r.case_name == case and r.precision == prec), None)
+                gpu_r = next((r for r in gpu_results if r.case_name == case and r.precision == prec), None)
+                if cpu_r and gpu_r and cpu_r.tflops > 0:
+                    speedup = gpu_r.tflops / cpu_r.tflops
+                    row += f" {speedup:.1f}x |"
+                else:
+                    row += " N/A |"
+            lines.append(row)
+
         lines.append("")
         return lines

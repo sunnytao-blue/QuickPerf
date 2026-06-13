@@ -7,6 +7,10 @@ from config import GpuBackendType, Precision
 CPU_TO_CUPY_DTYPE = {
     np.float64: "float64",
     np.float32: "float32",
+    np.int64: "int64",
+    np.int32: "int32",
+    np.int16: "int16",
+    np.int8: "int8",
 }
 
 PRECISION_TO_CUPY = {
@@ -14,6 +18,10 @@ PRECISION_TO_CUPY = {
     Precision.FP32: "float32",
     Precision.FP16: "float16",
     Precision.BF16: "bfloat16",
+    Precision.INT64: "int64",
+    Precision.INT32: "int32",
+    Precision.INT16: "int16",
+    Precision.INT8: "int8",
 }
 
 
@@ -28,8 +36,11 @@ class CudaBackend(GpuBackend):
 
     def _to_cupy_dtype(self, arr: np.ndarray):
         dtype_key = arr.dtype.type
-        cupy_str = CPU_TO_CUPY_DTYPE.get(dtype_key, "float32")
-        return getattr(self.cp, cupy_str)
+        if dtype_key in CPU_TO_CUPY_DTYPE:
+            cupy_str = CPU_TO_CUPY_DTYPE[dtype_key]
+        else:
+            cupy_str = str(arr.dtype)
+        return getattr(self.cp, cupy_str, None) or self.cp.float32
 
     def _precision_to_dtype(self, precision: Precision):
         cupy_str = PRECISION_TO_CUPY.get(precision, "float32")

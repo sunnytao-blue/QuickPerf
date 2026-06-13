@@ -8,6 +8,10 @@ class Precision(Enum):
     FP32 = "FP32"
     FP16 = "FP16"
     BF16 = "BF16"
+    INT64 = "INT64"
+    INT32 = "INT32"
+    INT16 = "INT16"
+    INT8 = "INT8"
 
 
 class TestTarget(Enum):
@@ -27,16 +31,34 @@ class GpuBackendType(Enum):
     NONE = "NONE"
 
 
+INTEGER_PRECISIONS = {Precision.INT64, Precision.INT32, Precision.INT16, Precision.INT8}
+FLOAT_SIMULATED = {Precision.FP16, Precision.BF16}
+
 PRECISION_NOTE: Dict[Precision, str] = {
     Precision.FP16: "FP16(float32 simulate)",
     Precision.BF16: "BF16(float32 simulate)",
 }
 
 PRECISION_DISPLAY: Dict[Precision, str] = {
-    Precision.FP64: "FP64",
-    Precision.FP32: "FP32",
-    Precision.FP16: "FP16 (simulated on CPU)",
-    Precision.BF16: "BF16 (simulated on CPU)",
+    Precision.FP64: "FP64 (双精度浮点)",
+    Precision.FP32: "FP32 (单精度浮点)",
+    Precision.FP16: "FP16 (半精度, CPU模拟)",
+    Precision.BF16: "BF16 (BFloat16, CPU模拟)",
+    Precision.INT64: "INT64 (64位整数)",
+    Precision.INT32: "INT32 (32位整数)",
+    Precision.INT16: "INT16 (16位整数)",
+    Precision.INT8: "INT8 (8位整数)",
+}
+
+PRECISION_TO_CPU_DTYPE: Dict[Precision, str] = {
+    Precision.FP64: "float64",
+    Precision.FP32: "float32",
+    Precision.FP16: "float32",
+    Precision.BF16: "float32",
+    Precision.INT64: "int64",
+    Precision.INT32: "int32",
+    Precision.INT16: "int16",
+    Precision.INT8: "int8",
 }
 
 
@@ -72,6 +94,7 @@ class SystemInfo:
     gpu_backend: Optional[str] = None
     os_info: str = ""
     cuda_version: Optional[str] = None
+    supported_precisions: str = ""
 
 
 @dataclass

@@ -1,14 +1,22 @@
 import time
 import numpy as np
 from cases.base import BenchmarkCase
-from config import DurationMode, Precision
+from config import DurationMode, Precision, PRECISION_TO_CPU_DTYPE
 
-CPU_DTYPE = {
-    Precision.FP64: np.float64,
-    Precision.FP32: np.float32,
-    Precision.FP16: np.float32,
-    Precision.BF16: np.float32,
-}
+
+def _get_dtype(precision: Precision):
+    dtype_str = PRECISION_TO_CPU_DTYPE[precision]
+    return np.dtype(dtype_str).type
+
+
+def _create_array(shape, precision: Precision):
+    dtype = _get_dtype(precision)
+    rng = np.random.default_rng(42)
+    if np.issubdtype(dtype, np.integer):
+        info = np.iinfo(dtype)
+        return rng.integers(info.min // 2, info.max // 2, shape, dtype=dtype)
+    else:
+        return rng.random(shape, dtype=dtype)
 
 
 class SaxpyCase(BenchmarkCase):
@@ -30,11 +38,10 @@ class SaxpyCase(BenchmarkCase):
             }[mode]
 
     def run_cpu(self, size: int, precision: Precision) -> float:
-        dtype = CPU_DTYPE[precision]
-        rng = np.random.default_rng(42)
-        x = rng.random(size, dtype=dtype)
-        y = rng.random(size, dtype=dtype)
-        alpha = dtype(2.0)
+        dtype = _get_dtype(precision)
+        x = _create_array(size, precision)
+        y = _create_array(size, precision)
+        alpha = dtype(2)
 
         _ = alpha * x + y
 
@@ -50,11 +57,10 @@ class SaxpyCase(BenchmarkCase):
         return best
 
     def run_gpu(self, size: int, precision: Precision, backend) -> float:
-        dtype = CPU_DTYPE[precision]
-        rng = np.random.default_rng(42)
-        x_host = rng.random(size, dtype=dtype)
-        y_host = rng.random(size, dtype=dtype)
-        alpha = dtype(2.0)
+        dtype = _get_dtype(precision)
+        x_host = _create_array(size, precision)
+        y_host = _create_array(size, precision)
+        alpha = dtype(2)
 
         x_dev = backend.to_device(x_host, precision)
         y_dev = backend.to_device(y_host, precision)

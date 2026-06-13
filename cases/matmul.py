@@ -1,14 +1,22 @@
 import time
 import numpy as np
 from cases.base import BenchmarkCase
-from config import DurationMode, Precision
+from config import DurationMode, Precision, PRECISION_TO_CPU_DTYPE, FLOAT_SIMULATED, INTEGER_PRECISIONS
 
-CPU_DTYPE = {
-    Precision.FP64: np.float64,
-    Precision.FP32: np.float32,
-    Precision.FP16: np.float32,
-    Precision.BF16: np.float32,
-}
+
+def _get_dtype(precision: Precision):
+    dtype_str = PRECISION_TO_CPU_DTYPE[precision]
+    return np.dtype(dtype_str).type
+
+
+def _create_array(shape, precision: Precision):
+    dtype = _get_dtype(precision)
+    rng = np.random.default_rng(42)
+    if np.issubdtype(dtype, np.integer):
+        info = np.iinfo(dtype)
+        return rng.integers(info.min // 2, info.max // 2, shape, dtype=dtype)
+    else:
+        return rng.random(shape, dtype=dtype)
 
 
 class MatMulCase(BenchmarkCase):
@@ -24,10 +32,9 @@ class MatMulCase(BenchmarkCase):
             return {DurationMode.QUICK: 512, DurationMode.NORMAL: 1024}[mode]
 
     def run_cpu(self, size: int, precision: Precision) -> float:
-        dtype = CPU_DTYPE[precision]
-        rng = np.random.default_rng(42)
-        A = rng.random((size, size), dtype=dtype)
-        B = rng.random((size, size), dtype=dtype)
+        dtype = _get_dtype(precision)
+        A = _create_array((size, size), precision)
+        B = _create_array((size, size), precision)
 
         _ = A @ B
 
@@ -43,10 +50,9 @@ class MatMulCase(BenchmarkCase):
         return best
 
     def run_gpu(self, size: int, precision: Precision, backend) -> float:
-        dtype = CPU_DTYPE[precision]
-        rng = np.random.default_rng(42)
-        A_host = rng.random((size, size), dtype=dtype)
-        B_host = rng.random((size, size), dtype=dtype)
+        dtype = _get_dtype(precision)
+        A_host = _create_array((size, size), precision)
+        B_host = _create_array((size, size), precision)
 
         A_dev = backend.to_device(A_host, precision)
         B_dev = backend.to_device(B_host, precision)

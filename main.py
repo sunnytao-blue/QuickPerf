@@ -4,16 +4,20 @@ import time
 import platform
 from typing import List, Optional
 
-from config import Precision, TestTarget, DurationMode, RunnerConfig, SystemInfo
+from config import Precision, TestTarget, DurationMode, RunnerConfig, SystemInfo, PRECISION_DISPLAY
 from utils.gpu_detect import detect_gpu, get_cpu_info, get_cuda_version
+from utils.hardware_info import get_supported_precisions, format_precision_list
 from benchmark.runner import Runner
 from benchmark.gpu_backend import create_backend, GpuBackend
 
 ALL_CASES = ["matmul", "saxpy", "reduction"]
-ALL_PRECISIONS = [Precision.FP64, Precision.FP32, Precision.FP16, Precision.BF16]
+ALL_PRECISIONS = list(Precision)
 
 TARGET_MAP = {"cpu": TestTarget.CPU, "gpu": TestTarget.GPU, "both": TestTarget.BOTH}
-PREC_MAP = {"fp64": Precision.FP64, "fp32": Precision.FP32, "fp16": Precision.FP16, "bf16": Precision.BF16}
+PREC_MAP = {
+    "fp64": Precision.FP64, "fp32": Precision.FP32, "fp16": Precision.FP16, "bf16": Precision.BF16,
+    "int64": Precision.INT64, "int32": Precision.INT32, "int16": Precision.INT16, "int8": Precision.INT8,
+}
 MODE_MAP = {"quick": DurationMode.QUICK, "normal": DurationMode.NORMAL}
 
 
@@ -48,12 +52,12 @@ def print_options():
 可用选项:
   测试目标:  cpu, gpu, both
   测试用例:  matmul, saxpy, reduction, all
-  测试精度:  fp64, fp32, fp16, bf16
+  测试精度:  fp64, fp32, fp16, bf16, int64, int32, int16, int8, all
   测试时长:  quick, normal
 
 快捷示例:
   python main.py -t cpu -c all -p fp32 -m quick
-  python main.py -t both -c matmul,saxpy -p fp32,fp16 -m normal
+  python main.py -t both -c matmul,saxpy -p fp32,fp16,int32 -m normal
 """)
 
 
@@ -87,10 +91,12 @@ def parse_precisions(arg: Optional[str]) -> Optional[List[Precision]]:
     if arg is None:
         return None
     parts = [p.strip().lower() for p in arg.split(",")]
+    if "all" in parts:
+        return list(ALL_PRECISIONS)
     precs = []
     for p in parts:
         if p not in PREC_MAP:
-            print(f"  无效精度: {p}，可选: {', '.join(PREC_MAP.keys())}")
+            print(f"  无效精度: {p}，可选: {', '.join(list(PREC_MAP.keys()) + ['all'])}")
             sys.exit(1)
         precs.append(PREC_MAP[p])
     return precs
@@ -122,6 +128,9 @@ def main():
 
     gpu_type, gpu_name = detect_gpu()
     print_gpu_status(gpu_type, gpu_name)
+
+    supported = get_supported_precisions(gpu_type, gpu_name)
+    print(f"  支持精度: {format_precision_list(supported)}\n")
 
     config = build_config(args, gpu_type, gpu_name)
     if config is None:
@@ -343,18 +352,21 @@ def select_cases() -> List[str]:
 
 
 def select_precisions() -> List[Precision]:
-    prec_map = {
-        "1": Precision.FP64,
-        "2": Precision.FP32,
-        "3": Precision.FP16,
-        "4": Precision.BF16,
-    }
-
-    print("\n  请选择测试精度 (用逗号分隔，如 1,2):")
+    print("\n  请选择测试精度 (用逗号分隔，如 1,2 或 1,2,5,6):")
     print("    1. FP64 (双精度)")
     print("    2. FP32 (单精度)")
     print("    3. FP16 (半精度 - CPU 用 float32 模拟)")
     print("    4. BF16 (BFloat16 - CPU 用 float32 模拟)")
+    print("    5. INT64 (64位整数)")
+    print("    6. INT32 (32位整数)")
+    print("    7. INT16 (16位整数)")
+    print("    8. INT8  (8位整数)")
+    print("    0. All  (全部精度)")
+
+    prec_map = {
+        "1": Precision.FP64, "2": Precision.FP32, "3": Precision.FP16, "4": Precision.BF16,
+        "5": Precision.INT64, "6": Precision.INT32, "7": Precision.INT16, "8": Precision.INT8,
+    }
 
     while True:
         try:
@@ -362,9 +374,13 @@ def select_precisions() -> List[Precision]:
             if not raw:
                 print("  请至少选择一个精度")
                 continue
+            if raw == "0":
+                return list(ALL_PRECISIONS)
             indices = [x.strip() for x in raw.split(",")]
             precs = []
             for idx in indices:
+                if idx == "0":
+                    return list(ALL_PRECISIONS)
                 if idx in prec_map:
                     precs.append(prec_map[idx])
                 else:
@@ -429,6 +445,36 @@ def print_results_summary(results):
                 else:
                     eff_str = "能效:N/A"
                 print(f"  {cpu_r.case_name:12s} ({cpu_r.precision:4s})  性能:{speedup:.1f}x  {eff_str}")
+
+        print_precision_comparison(cpu_results, gpu_results)
+
+
+def print_precision_comparison(cpu_results, gpu_results):
+    if not cpu_results or not gpu_results:
+        return
+    precisions = sorted(set(r.precision for r in cpu_results))
+    if len(precisions) < 2:
+        return
+
+    cases = sorted(set(r.case_name for r in cpu_results))
+
+    print("\n  === 跨精度对比 (GPU vs CPU 加速比) ===")
+    header = f"  {'用例':12s}"
+    for prec in precisions:
+        header += f"  {prec:>6s}"
+    print(header)
+
+    for case in cases:
+        row = f"  {case:12s}"
+        for prec in precisions:
+            cpu_r = next((r for r in cpu_results if r.case_name == case and r.precision == prec), None)
+            gpu_r = next((r for r in gpu_results if r.case_name == case and r.precision == prec), None)
+            if cpu_r and gpu_r and cpu_r.tflops > 0:
+                speedup = gpu_r.tflops / cpu_r.tflops
+                row += f"  {speedup:5.1f}x"
+            else:
+                row += f"  {'N/A':>6s}"
+        print(row)
 
 
 if __name__ == "__main__":

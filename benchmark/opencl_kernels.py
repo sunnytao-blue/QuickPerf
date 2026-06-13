@@ -124,6 +124,10 @@ PRECISION_TO_OCL = {
     Precision.FP32: np.float32,
     Precision.FP16: np.float32,
     Precision.BF16: np.float32,
+    Precision.INT64: np.int64,
+    Precision.INT32: np.int32,
+    Precision.INT16: np.int16,
+    Precision.INT8: np.int8,
 }
 
 
