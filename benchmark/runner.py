@@ -16,18 +16,21 @@ class Runner:
         results = []
 
         total_tasks = 0
-        if TestTarget.CPU in self.config.targets or TestTarget.BOTH in self.config.targets:
+        has_cpu = TestTarget.CPU in self.config.targets or TestTarget.BOTH in self.config.targets
+        has_gpu = (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets or
+                   TestTarget.GPU_VS_GPU in self.config.targets)
+        if has_cpu:
             total_tasks += len(self.config.cases) * len(self.config.precisions)
-        if (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets):
+        if has_gpu:
             total_tasks += len(self.config.cases) * len(self.config.precisions) * len(self.gpu_backends)
 
         completed = 0
 
-        if TestTarget.CPU in self.config.targets or TestTarget.BOTH in self.config.targets:
+        if has_cpu:
             results.extend(self._run_cpu_tests(progress_callback, total_tasks, completed))
             completed += len(self.config.cases) * len(self.config.precisions)
 
-        if (TestTarget.GPU in self.config.targets or TestTarget.BOTH in self.config.targets):
+        if has_gpu:
             for backend in self.gpu_backends:
                 results.extend(self._run_gpu_tests(backend, progress_callback, total_tasks, completed))
                 completed += len(self.config.cases) * len(self.config.precisions)

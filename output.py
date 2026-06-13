@@ -50,6 +50,9 @@ def print_results_summary(results):
 
         print_precision_comparison(cpu_results, gpu_results)
 
+    elif not cpu_results and len(set(r.gpu_name for r in gpu_results if r.gpu_name)) >= 2:
+        _print_gpu_vs_gpu_speedup(gpu_results)
+
 
 def _print_single_precision_comparison(results, target_label):
     precisions = sorted(set(r.precision for r in results), key=precision_sort_key)
@@ -131,6 +134,50 @@ def _print_three_way_comparison(cpu_results, gpu_results, gpu_names):
                     row += f"  {'N/A':>{name_w}s}"
                     speedups.append("N/A")
             row += f"  {', '.join(speedups):>8s}"
+            print(row)
+
+
+def _print_gpu_vs_gpu_speedup(gpu_results):
+    gpu_names = sorted(set(r.gpu_name for r in gpu_results if r.gpu_name))
+    if len(gpu_names) < 2:
+        return
+
+    cases = sorted(set(r.case_name for r in gpu_results))
+    precisions = sorted(set(r.precision for r in gpu_results), key=precision_sort_key)
+    base_name = gpu_names[0]
+    other_names = gpu_names[1:]
+
+    print(f"\n  === GPU vs GPU 加速比 (基准: {base_name}) ===")
+    name_w = max(len(n) for n in gpu_names)
+
+    for prec in precisions:
+        print(f"\n  精度: {prec}")
+        header = f"  {'用例':12s}"
+        for name in gpu_names:
+            header += f"  {name:>{name_w}s}"
+        header += "  加速比"
+        print(header)
+
+        for case in cases:
+            base = next((r for r in gpu_results if r.case_name == case and r.precision == prec and r.gpu_name == base_name), None)
+            if not base or base.tflops <= 0:
+                continue
+            row = f"  {case:12s}"
+            speedups = []
+            for name in gpu_names:
+                r = next((x for x in gpu_results if x.case_name == case and x.precision == prec and x.gpu_name == name), None)
+                if r and r.tflops > 0:
+                    row += f"  {r.tflops:{name_w}.4f}"
+                else:
+                    row += f"  {'N/A':>{name_w}s}"
+
+            for name in other_names:
+                r = next((x for x in gpu_results if x.case_name == case and x.precision == prec and x.gpu_name == name), None)
+                if r and r.tflops > 0:
+                    speedups.append(f"{name}/{base_name}={r.tflops / base.tflops:.1f}x")
+                else:
+                    speedups.append(f"{name}/N/A")
+            row += f"  {', '.join(speedups)}"
             print(row)
 
 

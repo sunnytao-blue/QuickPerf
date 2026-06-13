@@ -18,6 +18,7 @@ class TestTarget(Enum):
     CPU = "CPU"
     GPU = "GPU"
     BOTH = "BOTH"
+    GPU_VS_GPU = "GPU_VS_GPU"
 
 
 class DurationMode(Enum):

@@ -34,7 +34,7 @@ def main():
     if config is None:
         return
 
-    if TestTarget.GPU in config.targets or TestTarget.BOTH in config.targets:
+    if TestTarget.GPU in config.targets or TestTarget.BOTH in config.targets or TestTarget.GPU_VS_GPU in config.targets:
         selected_gpus = [g for g in all_gpus if g.index in config.gpu_indices]
     else:
         selected_gpus = []

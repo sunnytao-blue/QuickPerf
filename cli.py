@@ -13,7 +13,7 @@ from utils.gpu_detect import GpuInfo
 ALL_CASES = ["matmul", "saxpy", "reduction"]
 ALL_PRECISIONS = list(Precision)
 
-TARGET_MAP = {"cpu": TestTarget.CPU, "gpu": TestTarget.GPU, "both": TestTarget.BOTH}
+TARGET_MAP = {"cpu": TestTarget.CPU, "gpu": TestTarget.GPU, "both": TestTarget.BOTH, "gpu-gpu": TestTarget.GPU_VS_GPU}
 PREC_MAP = {
     "fp64": Precision.FP64, "fp32": Precision.FP32, "fp16": Precision.FP16, "bf16": Precision.BF16,
     "int64": Precision.INT64, "int32": Precision.INT32, "int16": Precision.INT16, "int8": Precision.INT8,
@@ -33,8 +33,8 @@ def build_parser(all_gpus: List[GpuInfo]):
             "  python main.py --list\n"
         ),
     )
-    parser.add_argument("-t", "--target", choices=["cpu", "gpu", "both"],
-                        help="测试目标: cpu, gpu, both")
+    parser.add_argument("-t", "--target", choices=["cpu", "gpu", "both", "gpu-gpu"],
+                        help="测试目标: cpu, gpu, both, gpu-gpu")
     parser.add_argument("-c", "--cases",
                         help="测试用例 (逗号分隔): matmul, saxpy, reduction, all")
     parser.add_argument("-p", "--precision",
@@ -164,6 +164,18 @@ def build_config(args, all_gpus: List[GpuInfo], supported_precisions):
         gpu_indices = select_gpu_indices(all_gpus)
         if gpu_indices is None:
             return None
+    elif target == TestTarget.GPU_VS_GPU:
+        if len(all_gpus) < 2:
+            print("  需要至少 2 块 GPU 才能进行 GPU 对比测试")
+            sys.exit(1)
+        if gpu_indices is None:
+            print("\n  请选择要对比的 2 块 GPU:")
+            gpu_indices = select_gpu_indices(all_gpus)
+            if gpu_indices is None:
+                return None
+        if len(gpu_indices) < 2:
+            print("  GPU 对比测试需要选择 2 块 GPU")
+            sys.exit(1)
     elif target == TestTarget.CPU:
         gpu_indices = []
     if cases is None:
@@ -192,7 +204,9 @@ def build_config(args, all_gpus: List[GpuInfo], supported_precisions):
     print_config_summary(target, cases, precisions, mode, all_gpus, gpu_indices)
 
     targets = [TestTarget.CPU] if target == TestTarget.CPU else (
-        [TestTarget.GPU] if target == TestTarget.GPU else [TestTarget.BOTH]
+        [TestTarget.GPU] if target == TestTarget.GPU else (
+            [TestTarget.BOTH] if target == TestTarget.BOTH else [TestTarget.GPU_VS_GPU]
+        )
     )
 
     return RunnerConfig(
@@ -205,7 +219,7 @@ def build_config(args, all_gpus: List[GpuInfo], supported_precisions):
 
 
 def print_config_summary(target, cases, precisions, mode, all_gpus, gpu_indices):
-    target_label = {TestTarget.CPU: "CPU", TestTarget.GPU: "GPU", TestTarget.BOTH: "CPU + GPU"}
+    target_label = {TestTarget.CPU: "CPU", TestTarget.GPU: "GPU", TestTarget.BOTH: "CPU + GPU", TestTarget.GPU_VS_GPU: "GPU vs GPU"}
     mode_label = {"quick": "Quick (~5-10s)", "normal": "Normal (~30-60s)"}
     print()
     print("  测试配置确认:")
@@ -247,6 +261,15 @@ def interactive_config(all_gpus: List[GpuInfo], supported_precisions):
         gpu_indices = select_gpu_indices(all_gpus)
         if gpu_indices is None:
             return None
+    elif target == TestTarget.GPU_VS_GPU:
+        if len(all_gpus) < 2:
+            print("  需要至少 2 块 GPU 才能进行 GPU 对比测试")
+            return None
+        print("\n  请选择要对比的 2 块 GPU:")
+        gpu_indices = select_gpu_indices(all_gpus)
+        if gpu_indices is None or len(gpu_indices) < 2:
+            print("  GPU 对比测试需要选择 2 块 GPU")
+            return None
 
     cases = select_cases()
     if not cases:
@@ -261,7 +284,9 @@ def interactive_config(all_gpus: List[GpuInfo], supported_precisions):
         return None
 
     targets = [TestTarget.CPU] if target == TestTarget.CPU else (
-        [TestTarget.GPU] if target == TestTarget.GPU else [TestTarget.BOTH]
+        [TestTarget.GPU] if target == TestTarget.GPU else (
+            [TestTarget.BOTH] if target == TestTarget.BOTH else [TestTarget.GPU_VS_GPU]
+        )
     )
 
     return RunnerConfig(
@@ -275,11 +300,15 @@ def interactive_config(all_gpus: List[GpuInfo], supported_precisions):
 
 def select_target(all_gpus: List[GpuInfo]):
     has_gpu = len(all_gpus) > 0
+    has_multi_gpu = len(all_gpus) >= 2
     print("\n  请选择测试目标:")
     print("    1. CPU only")
     if has_gpu:
         print("    2. GPU only")
-        print("    3. CPU + GPU (对比测试)")
+    if has_multi_gpu:
+        print("    3. GPU vs GPU (对比两块GPU)")
+    if has_gpu:
+        print("    4. CPU + GPU (CPU与GPU对比)")
     print("    q. 退出")
 
     while True:
@@ -292,7 +321,9 @@ def select_target(all_gpus: List[GpuInfo]):
                 return TestTarget.CPU
             elif choice == 2 and has_gpu:
                 return TestTarget.GPU
-            elif choice == 3 and has_gpu:
+            elif choice == 3 and has_multi_gpu:
+                return TestTarget.GPU_VS_GPU
+            elif choice == 4 and has_gpu:
                 return TestTarget.BOTH
             else:
                 print("  无效选择，请重新输入")
