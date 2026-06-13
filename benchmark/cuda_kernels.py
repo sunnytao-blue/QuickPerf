@@ -53,7 +53,14 @@ class CudaBackend(GpuBackend):
         return self.cp.matmul(A, B)
 
     def saxpy(self, alpha, x, y):
-        y += alpha * x
+        if not hasattr(self, '_saxpy_kernels'):
+            self._saxpy_kernels = {}
+        dtype_key = str(x.dtype)
+        if dtype_key not in self._saxpy_kernels:
+            self._saxpy_kernels[dtype_key] = self.cp.ElementwiseKernel(
+                f'{dtype_key} x, {dtype_key} alpha', f'{dtype_key} y',
+                'y = alpha * x + y', 'saxpy')
+        self._saxpy_kernels[dtype_key](x, self.cp.dtype(dtype_key).type(alpha), y)
         return y
 
     def sum(self, arr):
