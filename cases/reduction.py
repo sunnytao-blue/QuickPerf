@@ -1,22 +1,8 @@
 import time
 import numpy as np
 from cases.base import BenchmarkCase
-from config import DurationMode, Precision, PRECISION_TO_CPU_DTYPE
-
-
-def _get_dtype(precision: Precision):
-    dtype_str = PRECISION_TO_CPU_DTYPE[precision]
-    return np.dtype(dtype_str).type
-
-
-def _create_array(shape, precision: Precision):
-    dtype = _get_dtype(precision)
-    rng = np.random.default_rng(42)
-    if np.issubdtype(dtype, np.integer):
-        info = np.iinfo(dtype)
-        return rng.integers(info.min // 2, info.max // 2, shape, dtype=dtype)
-    else:
-        return rng.random(shape, dtype=dtype)
+from cases.utils import get_dtype, create_array
+from config import DurationMode, Precision
 
 
 class ReductionCase(BenchmarkCase):
@@ -38,8 +24,8 @@ class ReductionCase(BenchmarkCase):
             }[mode]
 
     def run_cpu(self, size: int, precision: Precision) -> float:
-        dtype = _get_dtype(precision)
-        arr = _create_array(size, precision)
+        dtype = get_dtype(precision)
+        arr = create_array(size, precision)
 
         _ = np.sum(arr)
 
@@ -55,8 +41,8 @@ class ReductionCase(BenchmarkCase):
         return best
 
     def run_gpu(self, size: int, precision: Precision, backend) -> float:
-        dtype = _get_dtype(precision)
-        arr_host = _create_array(size, precision)
+        dtype = get_dtype(precision)
+        arr_host = create_array(size, precision)
 
         arr_dev = backend.to_device(arr_host, precision)
 

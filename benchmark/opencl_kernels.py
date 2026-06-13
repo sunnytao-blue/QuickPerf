@@ -1,123 +1,23 @@
+import os
 import numpy as np
-import warnings
 
 from benchmark.gpu_backend import GpuBackend
 from config import GpuBackendType, Precision
 
-SAXPY_FLOAT = """
-__kernel void saxpy(__global const float *x, __global float *y, float alpha, int N) {
-    int i = get_global_id(0);
-    int stride = get_global_size(0);
-    for (; i < N; i += stride) {
-        y[i] = alpha * x[i] + y[i];
-    }
-}
-"""
+_KERNEL_DIR = os.path.join(os.path.dirname(__file__), "opencl")
 
-SAXPY_DOUBLE = """
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-__kernel void saxpy_double(__global const double *x, __global double *y, double alpha, int N) {
-    int i = get_global_id(0);
-    int stride = get_global_size(0);
-    for (; i < N; i += stride) {
-        y[i] = alpha * x[i] + y[i];
-    }
-}
-"""
 
-MATMUL_FLOAT = """
-__kernel void matmul_naive(__global const float *A,
-                           __global const float *B,
-                           __global float *C,
-                           int N) {
-    int row = get_global_id(0);
-    int col = get_global_id(1);
-    if (row >= N || col >= N) return;
-    float sum = 0.0f;
-    for (int k = 0; k < N; ++k) {
-        sum += A[row * N + k] * B[k * N + col];
-    }
-    C[row * N + col] = sum;
-}
-"""
+def _load_kernel(filename: str) -> str:
+    with open(os.path.join(_KERNEL_DIR, filename), "r") as f:
+        return f.read()
 
-MATMUL_DOUBLE = """
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-__kernel void matmul_naive_double(__global const double *A,
-                                   __global const double *B,
-                                   __global double *C,
-                                   int N) {
-    int row = get_global_id(0);
-    int col = get_global_id(1);
-    if (row >= N || col >= N) return;
-    double sum = 0.0;
-    for (int k = 0; k < N; ++k) {
-        sum += A[row * N + k] * B[k * N + col];
-    }
-    C[row * N + col] = sum;
-}
-"""
 
-REDUCE_FLOAT = """
-__kernel void reduce_sum(__global const float *input,
-                          __global float *output,
-                          __local float *local_sum,
-                          int N) {
-    int gid = get_global_id(0);
-    int lid = get_local_id(0);
-    int gsize = get_global_size(0);
-    int group_size = get_local_size(0);
-
-    float acc = 0.0f;
-    for (int i = gid; i < N; i += gsize) {
-        acc += input[i];
-    }
-    local_sum[lid] = acc;
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    for (int s = group_size / 2; s > 0; s >>= 1) {
-        if (lid < s) {
-            local_sum[lid] += local_sum[lid + s];
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    if (lid == 0) {
-        output[get_group_id(0)] = local_sum[0];
-    }
-}
-"""
-
-REDUCE_DOUBLE = """
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-__kernel void reduce_sum_double(__global const double *input,
-                                 __global double *output,
-                                 __local double *local_sum,
-                                 int N) {
-    int gid = get_global_id(0);
-    int lid = get_local_id(0);
-    int gsize = get_global_size(0);
-    int group_size = get_local_size(0);
-
-    double acc = 0.0;
-    for (int i = gid; i < N; i += gsize) {
-        acc += input[i];
-    }
-    local_sum[lid] = acc;
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    for (int s = group_size / 2; s > 0; s >>= 1) {
-        if (lid < s) {
-            local_sum[lid] += local_sum[lid + s];
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    if (lid == 0) {
-        output[get_group_id(0)] = local_sum[0];
-    }
-}
-"""
+SAXPY_FLOAT = _load_kernel("saxpy.cl")
+SAXPY_DOUBLE = _load_kernel("saxpy_double.cl")
+MATMUL_FLOAT = _load_kernel("matmul.cl")
+MATMUL_DOUBLE = _load_kernel("matmul_double.cl")
+REDUCE_FLOAT = _load_kernel("reduce.cl")
+REDUCE_DOUBLE = _load_kernel("reduce_double.cl")
 
 PRECISION_TO_OCL = {
     Precision.FP64: np.float64,
