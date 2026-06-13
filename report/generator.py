@@ -5,6 +5,24 @@ from typing import List
 from config import CaseResult, RunnerConfig, SystemInfo, TestTarget
 
 
+def _fmt_power(watts: float) -> str:
+    if watts <= 0:
+        return "N/A"
+    return f"{watts:.2f}"
+
+
+def _fmt_efficiency(gflops_per_watt: float) -> str:
+    if gflops_per_watt <= 0:
+        return "N/A"
+    return f"{gflops_per_watt:.2f}"
+
+
+def _fmt_energy(joules: float, watts: float) -> str:
+    if watts <= 0 or joules <= 0:
+        return "N/A"
+    return f"{joules:.2f}"
+
+
 class ReportGenerator:
     def __init__(self, results: List[CaseResult], config: RunnerConfig,
                  system_info: SystemInfo, total_time: float):
@@ -78,14 +96,15 @@ class ReportGenerator:
             return []
 
         lines = ["## CPU 测试结果", ""]
-        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
-        lines.append("|------|------|---------|----------|--------|----------|----------|------------------|------|")
+        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
+        lines.append("|------|------|---------|----------|--------|--------|----------|----------|------------------|------|")
         for r in cpu_results:
             note = r.note if r.note else "-"
             lines.append(
                 f"| {r.case_name} | {r.precision} | {r.problem_size} | "
-                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.avg_power_watts:.2f} | "
-                f"{r.energy_joules:.2f} | {r.efficiency_gflops_per_watt:.2f} | {note} |"
+                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | "
+                f"{_fmt_power(r.avg_power_watts)} | {_fmt_energy(r.energy_joules, r.avg_power_watts)} | "
+                f"{_fmt_efficiency(r.efficiency_gflops_per_watt)} | {note} |"
             )
         lines.append("")
         return lines
@@ -96,14 +115,15 @@ class ReportGenerator:
             return []
 
         lines = ["## GPU 测试结果", ""]
-        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
-        lines.append("|------|------|---------|----------|--------|----------|----------|------------------|------|")
+        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
+        lines.append("|------|------|---------|----------|--------|--------|----------|----------|------------------|------|")
         for r in gpu_results:
             note = r.note if r.note else "-"
             lines.append(
                 f"| {r.case_name} | {r.precision} | {r.problem_size} | "
-                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.avg_power_watts:.2f} | "
-                f"{r.energy_joules:.2f} | {r.efficiency_gflops_per_watt:.2f} | {note} |"
+                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | "
+                f"{_fmt_power(r.avg_power_watts)} | {_fmt_energy(r.energy_joules, r.avg_power_watts)} | "
+                f"{_fmt_efficiency(r.efficiency_gflops_per_watt)} | {note} |"
             )
         lines.append("")
         return lines
@@ -123,13 +143,16 @@ class ReportGenerator:
             gpu = gpu_results.get(key)
             if gpu and cpu.tflops > 0:
                 speedup = gpu.tflops / cpu.tflops
-                efficiency_improvement = gpu.efficiency_gflops_per_watt / cpu.efficiency_gflops_per_watt if cpu.efficiency_gflops_per_watt > 0 else 0
+                if cpu.efficiency_gflops_per_watt > 0 and gpu.efficiency_gflops_per_watt > 0:
+                    eff_str = f"{gpu.efficiency_gflops_per_watt / cpu.efficiency_gflops_per_watt:.1f}x"
+                else:
+                    eff_str = "N/A"
                 lines.append(
                     f"| {cpu.case_name} | {cpu.precision} | "
                     f"{cpu.tflops:.4f} | {gpu.tflops:.4f} | {speedup:.1f}x | "
-                    f"{cpu.avg_power_watts:.2f} | {gpu.avg_power_watts:.2f} | "
-                    f"{cpu.efficiency_gflops_per_watt:.2f} | {gpu.efficiency_gflops_per_watt:.2f} | "
-                    f"{efficiency_improvement:.1f}x |"
+                    f"{_fmt_power(cpu.avg_power_watts)} | {_fmt_power(gpu.avg_power_watts)} | "
+                    f"{_fmt_efficiency(cpu.efficiency_gflops_per_watt)} | {_fmt_efficiency(gpu.efficiency_gflops_per_watt)} | "
+                    f"{eff_str} |"
                 )
         lines.append("")
         return lines
