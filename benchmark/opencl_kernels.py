@@ -18,6 +18,8 @@ MATMUL_FLOAT = _load_kernel("matmul.cl")
 MATMUL_DOUBLE = _load_kernel("matmul_double.cl")
 REDUCE_FLOAT = _load_kernel("reduce.cl")
 REDUCE_DOUBLE = _load_kernel("reduce_double.cl")
+SOFTMAX_FLOAT = _load_kernel("softmax.cl")
+SOFTMAX_DOUBLE = _load_kernel("softmax_double.cl")
 
 PRECISION_TO_OCL = {
     Precision.FP64: np.float64,
@@ -63,6 +65,8 @@ class OpenCLBackend(GpuBackend):
         self._matmul_kernel = self._matmul_prog.matmul_naive
         self._reduce_prog = cl.Program(self._ctx, REDUCE_FLOAT).build()
         self._reduce_kernel = self._reduce_prog.reduce_sum
+        self._softmax_prog = cl.Program(self._ctx, SOFTMAX_FLOAT).build()
+        self._softmax_kernel = self._softmax_prog.softmax_row
 
         if self._has_fp64:
             self._saxpy_double_prog = cl.Program(self._ctx, SAXPY_DOUBLE).build()
@@ -71,6 +75,8 @@ class OpenCLBackend(GpuBackend):
             self._matmul_double_kernel = self._matmul_double_prog.matmul_naive_double
             self._reduce_double_prog = cl.Program(self._ctx, REDUCE_DOUBLE).build()
             self._reduce_double_kernel = self._reduce_double_prog.reduce_sum_double
+            self._softmax_double_prog = cl.Program(self._ctx, SOFTMAX_DOUBLE).build()
+            self._softmax_double_kernel = self._softmax_double_prog.softmax_row_double
         else:
             self._saxpy_double_prog = None
             self._saxpy_double_kernel = None
@@ -78,6 +84,8 @@ class OpenCLBackend(GpuBackend):
             self._matmul_double_kernel = None
             self._reduce_double_prog = None
             self._reduce_double_kernel = None
+            self._softmax_double_prog = None
+            self._softmax_double_kernel = None
 
         self._current_precision = Precision.FP32
 
@@ -117,21 +125,21 @@ class OpenCLBackend(GpuBackend):
 
     def matmul(self, A, B):
         self._check_fp64()
-        shape = getattr(A, "_ocl_shape", (2, 2))
-        if len(shape) == 2:
-            N = shape[0]
-        else:
-            N = int(np.sqrt(shape[0]))
-            shape = (N, N)
+        shape_a = getattr(A, "_ocl_shape", (2, 2))
+        shape_b = getattr(B, "_ocl_shape", (2, 2))
+        M = shape_a[0]
+        K = shape_a[1]
+        N = shape_b[1] if len(shape_b) > 1 else shape_b[0]
+        out_shape = (M, N)
         dtype = PRECISION_TO_OCL.get(self._current_precision, np.float32)
-        C = self.cl.Buffer(self._ctx, self.cl.mem_flags.READ_WRITE, size=N * N * np.dtype(dtype).itemsize)
-        C._ocl_shape = shape
+        C = self.cl.Buffer(self._ctx, self.cl.mem_flags.READ_WRITE, size=M * N * np.dtype(dtype).itemsize)
+        C._ocl_shape = out_shape
 
         if self._current_precision == Precision.FP64:
             kernel = self._matmul_double_kernel
         else:
             kernel = self._matmul_kernel
-        kernel(self._queue, (N, N), None, A, B, C, np.int32(N))
+        kernel(self._queue, (M, N), None, A, B, C, np.int32(K), np.int32(N))
         return C
 
     def saxpy(self, alpha, x, y):
@@ -192,6 +200,20 @@ class OpenCLBackend(GpuBackend):
         result = np.empty(1, dtype=dtype)
         self.cl.enqueue_copy(self._queue, result, current)
         return result[0]
+
+    def softmax(self, arr):
+        shape = getattr(arr, "_ocl_shape", (2, 2))
+        N = shape[1] if len(shape) > 1 else shape[0]
+        dtype = PRECISION_TO_OCL.get(self._current_precision, np.float32)
+        out_buf = self.cl.Buffer(self._ctx, self.cl.mem_flags.READ_WRITE, size=N * N * np.dtype(dtype).itemsize)
+        out_buf._ocl_shape = (N, N)
+
+        if self._current_precision == Precision.FP64 and self._has_fp64:
+            kernel = self._softmax_double_kernel
+        else:
+            kernel = self._softmax_kernel
+        kernel(self._queue, (N, N), None, arr, out_buf, np.int32(N))
+        return out_buf
 
     def dispose(self):
         self._queue = None

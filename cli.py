@@ -10,7 +10,7 @@ from config import (
 )
 from utils.gpu_detect import GpuInfo
 
-ALL_CASES = ["matmul", "saxpy", "reduction"]
+ALL_CASES = ["matmul", "saxpy", "reduction", "flashattention"]
 ALL_PRECISIONS = list(Precision)
 
 TARGET_MAP = {"cpu": TestTarget.CPU, "gpu": TestTarget.GPU, "both": TestTarget.BOTH, "gpu-gpu": TestTarget.GPU_VS_GPU}
@@ -366,13 +366,14 @@ def select_gpu_indices(all_gpus: List[GpuInfo]) -> Optional[List[int]]:
 
 
 def select_cases() -> List[str]:
-    case_map = {"1": "matmul", "2": "saxpy", "3": "reduction", "4": "all"}
+    case_map = {"1": "matmul", "2": "saxpy", "3": "reduction", "4": "flashattention", "5": "all"}
 
     print("\n  请选择测试用例 (用逗号分隔，如 1,2,3):")
-    print("    1. MatMul    (矩阵乘法)")
-    print("    2. SAXPY     (向量乘加)")
-    print("    3. Reduction (归约求和)")
-    print("    4. All       (全部用例)")
+    print("    1. MatMul        (矩阵乘法)")
+    print("    2. SAXPY         (向量乘加)")
+    print("    3. Reduction     (归约求和)")
+    print("    4. FlashAttention(注意力机制)")
+    print("    5. All           (全部用例)")
 
     while True:
         try:

@@ -97,5 +97,40 @@ class CudaBackend(GpuBackend):
                 'x', 'a + b', 'out = a', '0', 'sum_reduce')
         return self._sum_kernels[dtype_key](arr)
 
+    def softmax(self, arr):
+        self.cp.get_default_memory_pool().free_all_blocks()
+        try:
+            max_val = self.cp.max(arr, axis=1, keepdims=True)
+            exp_arr = self.cp.exp(arr - max_val)
+            return exp_arr / self.cp.sum(exp_arr, axis=1, keepdims=True)
+        except Exception:
+            pass
+
+        if not hasattr(self, '_softmax_kernels'):
+            self._softmax_kernels = {}
+        dtype_key = str(arr.dtype)
+        if dtype_key not in self._softmax_kernels:
+            self._softmax_kernels[dtype_key] = self.cp.ElementwiseKernel(
+                f'raw {dtype_key} x, int64 N',
+                f'{dtype_key} y',
+                '''
+                int row = i / N;
+                int col = i % N;
+                double max_val = -1e30;
+                for (int j = 0; j < N; j++) {
+                    max_val = max(max_val, (double)x[row * N + j]);
+                }
+                double sum = 0.0;
+                for (int j = 0; j < N; j++) {
+                    sum += exp((double)x[row * N + j] - max_val);
+                }
+                y = ({dtype_key})(exp((double)x[i] - max_val) / sum);
+                ''',
+                'softmax_row')
+        N = arr.shape[1] if len(arr.shape) > 1 else arr.shape[0]
+        out = self.cp.empty_like(arr)
+        self._softmax_kernels[dtype_key](arr, N, out, size=arr.size)
+        return out
+
     def dispose(self):
         self.cp.get_default_memory_pool().free_all_blocks()

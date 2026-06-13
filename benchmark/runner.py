@@ -140,11 +140,13 @@ class Runner:
         from cases.matmul import MatMulCase
         from cases.saxpy import SaxpyCase
         from cases.reduction import ReductionCase
+        from cases.flashattention import FlashAttentionCase
 
         registry = {
             "matmul": MatMulCase,
             "saxpy": SaxpyCase,
             "reduction": ReductionCase,
+            "flashattention": FlashAttentionCase,
         }
         return [registry[name]() for name in self.config.cases if name in registry]
 

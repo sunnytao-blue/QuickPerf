@@ -39,6 +39,10 @@ class GpuBackend(ABC):
         ...
 
     @abstractmethod
+    def softmax(self, arr):
+        ...
+
+    @abstractmethod
     def dispose(self):
         ...
 
