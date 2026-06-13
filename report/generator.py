@@ -56,6 +56,8 @@ class ReportGenerator:
         lines.extend(self._build_config())
         lines.extend(self._build_cpu_results())
         lines.extend(self._build_gpu_results())
+        lines.extend(self._build_cpu_precision_comparison())
+        lines.extend(self._build_gpu_precision_comparison())
         lines.extend(self._build_comparison())
         lines.extend(self._build_precision_comparison())
 
@@ -126,6 +128,46 @@ class ReportGenerator:
                 f"{_fmt_power(r.avg_power_watts)} | {_fmt_energy(r.energy_joules, r.avg_power_watts)} | "
                 f"{_fmt_efficiency(r.efficiency_gflops_per_watt)} | {note} |"
             )
+        lines.append("")
+        return lines
+
+    def _build_cpu_precision_comparison(self):
+        cpu_results = [r for r in self.results if r.target == "CPU"]
+        return self._build_single_precision_comparison(cpu_results, "CPU")
+
+    def _build_gpu_precision_comparison(self):
+        gpu_results = [r for r in self.results if r.target == "GPU"]
+        return self._build_single_precision_comparison(gpu_results, "GPU")
+
+    @staticmethod
+    def _build_single_precision_comparison(results, target_label):
+        if not results:
+            return []
+        precisions = sorted(set(r.precision for r in results))
+        if len(precisions) < 2:
+            return []
+
+        cases = sorted(set(r.case_name for r in results))
+
+        lines = [f"## {target_label} 跨精度对比 (TFLOPS)", ""]
+        header = "| 用例 |"
+        sep = "|------|"
+        for prec in precisions:
+            header += f" {prec} |"
+            sep += "--------|"
+        lines.append(header)
+        lines.append(sep)
+
+        for case in cases:
+            row = f"| {case} |"
+            for prec in precisions:
+                r = next((x for x in results if x.case_name == case and x.precision == prec), None)
+                if r and r.tflops > 0:
+                    row += f" {r.tflops:.4f} |"
+                else:
+                    row += " N/A |"
+            lines.append(row)
+
         lines.append("")
         return lines
 

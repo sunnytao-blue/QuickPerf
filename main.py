@@ -422,6 +422,7 @@ def print_results_summary(results):
             power_str = f"{r.avg_power_watts:.2f}W" if r.avg_power_watts > 0 else "N/A"
             eff_str = f"{r.efficiency_gflops_per_watt:.2f} GFLOPS/W" if r.efficiency_gflops_per_watt > 0 else "N/A"
             print(f"  {r.case_name:12s} ({r.precision:4s})  {r.time_seconds:.4f}s  {r.tflops:.4f} TFLOPS  {power_str}  {eff_str}")
+        _print_single_precision_comparison(cpu_results, "CPU")
 
     if gpu_results:
         print("\n  === GPU 结果汇总 ===")
@@ -429,6 +430,7 @@ def print_results_summary(results):
             power_str = f"{r.avg_power_watts:.2f}W" if r.avg_power_watts > 0 else "N/A"
             eff_str = f"{r.efficiency_gflops_per_watt:.2f} GFLOPS/W" if r.efficiency_gflops_per_watt > 0 else "N/A"
             print(f"  {r.case_name:12s} ({r.precision:4s})  {r.time_seconds:.4f}s  {r.tflops:.4f} TFLOPS  {power_str}  {eff_str}")
+        _print_single_precision_comparison(gpu_results, "GPU")
 
     if cpu_results and gpu_results:
         print("\n  === CPU vs GPU 加速比 ===")
@@ -447,6 +449,29 @@ def print_results_summary(results):
                 print(f"  {cpu_r.case_name:12s} ({cpu_r.precision:4s})  性能:{speedup:.1f}x  {eff_str}")
 
         print_precision_comparison(cpu_results, gpu_results)
+
+
+def _print_single_precision_comparison(results, target_label):
+    precisions = sorted(set(r.precision for r in results))
+    if len(precisions) < 2:
+        return
+    cases = sorted(set(r.case_name for r in results))
+
+    print(f"\n  === {target_label} 跨精度对比 (TFLOPS) ===")
+    row = f"  {'用例':12s}"
+    for prec in precisions:
+        row += f"  {prec:>7s}"
+    print(row)
+
+    for case in cases:
+        row = f"  {case:12s}"
+        for prec in precisions:
+            r = next((x for x in results if x.case_name == case and x.precision == prec), None)
+            if r and r.tflops > 0:
+                row += f"  {r.tflops:6.4f}"
+            else:
+                row += f"  {'N/A':>7s}"
+        print(row)
 
 
 def print_precision_comparison(cpu_results, gpu_results):
