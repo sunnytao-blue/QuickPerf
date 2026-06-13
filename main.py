@@ -132,7 +132,7 @@ def main():
     supported = get_supported_precisions(gpu_type, gpu_name)
     print(f"  支持精度: {format_precision_list(supported)}\n")
 
-    config = build_config(args, gpu_type, gpu_name)
+    config = build_config(args, gpu_type, gpu_name, supported)
     if config is None:
         return
 
@@ -193,9 +193,9 @@ def main():
     print_results_summary(results)
 
 
-def build_config(args, gpu_type, gpu_name):
+def build_config(args, gpu_type, gpu_name, supported_precisions):
     if not has_any_arg(args):
-        return interactive_config(gpu_type, gpu_name)
+        return interactive_config(gpu_type, gpu_name, supported_precisions)
 
     target = parse_target(args.target, gpu_name)
     cases = parse_cases(args.cases)
@@ -211,9 +211,18 @@ def build_config(args, gpu_type, gpu_name):
         if not cases:
             return None
     if precisions is None:
-        precisions = select_precisions()
+        precisions = select_precisions(supported_precisions)
         if not precisions:
             return None
+
+    filtered = [p for p in precisions if p in supported_precisions]
+    removed = [p.value for p in precisions if p not in supported_precisions]
+    if removed:
+        print(f"\n  GPU 不支持以下精度，已自动移除: {', '.join(removed)}")
+        precisions = filtered
+    if not precisions:
+        print("  错误: 没有可用的测试精度，退出。")
+        sys.exit(1)
     if mode is None:
         mode = select_duration_mode()
         if mode is None:
@@ -258,7 +267,7 @@ def print_gpu_status(gpu_type, gpu_name):
         print("\n  未检测到 GPU，仅可进行 CPU 测试")
 
 
-def interactive_config(gpu_type, gpu_name):
+def interactive_config(gpu_type, gpu_name, supported_precisions):
     target = select_target(gpu_type, gpu_name)
     if target is None:
         return None
@@ -267,7 +276,7 @@ def interactive_config(gpu_type, gpu_name):
     if not cases:
         return None
 
-    precisions = select_precisions()
+    precisions = select_precisions(supported_precisions)
     if not precisions:
         return None
 
@@ -351,22 +360,19 @@ def select_cases() -> List[str]:
             print("  无效输入")
 
 
-def select_precisions() -> List[Precision]:
-    print("\n  请选择测试精度 (用逗号分隔，如 1,2 或 1,2,5,6):")
-    print("    1. FP64 (双精度)")
-    print("    2. FP32 (单精度)")
-    print("    3. FP16 (半精度 - CPU 用 float32 模拟)")
-    print("    4. BF16 (BFloat16 - CPU 用 float32 模拟)")
-    print("    5. INT64 (64位整数)")
-    print("    6. INT32 (32位整数)")
-    print("    7. INT16 (16位整数)")
-    print("    8. INT8  (8位整数)")
-    print("    0. All  (全部精度)")
+def select_precisions(supported_precisions: List[Precision] = None) -> List[Precision]:
+    if supported_precisions is None:
+        supported_precisions = list(ALL_PRECISIONS)
 
-    prec_map = {
-        "1": Precision.FP64, "2": Precision.FP32, "3": Precision.FP16, "4": Precision.BF16,
-        "5": Precision.INT64, "6": Precision.INT32, "7": Precision.INT16, "8": Precision.INT8,
-    }
+    print("\n  请选择测试精度 (用逗号分隔，如 1,2 或输入 0 选全部):")
+    idx = 1
+    prec_map = {}
+    for prec in supported_precisions:
+        label = PRECISION_DISPLAY.get(prec, prec.value)
+        print(f"    {idx}. {label}")
+        prec_map[str(idx)] = prec
+        idx += 1
+    print(f"    0. All  (全部 {len(supported_precisions)} 种精度)")
 
     while True:
         try:
@@ -375,16 +381,16 @@ def select_precisions() -> List[Precision]:
                 print("  请至少选择一个精度")
                 continue
             if raw == "0":
-                return list(ALL_PRECISIONS)
+                return list(supported_precisions)
             indices = [x.strip() for x in raw.split(",")]
             precs = []
-            for idx in indices:
-                if idx == "0":
-                    return list(ALL_PRECISIONS)
-                if idx in prec_map:
-                    precs.append(prec_map[idx])
+            for i in indices:
+                if i == "0":
+                    return list(supported_precisions)
+                if i in prec_map:
+                    precs.append(prec_map[i])
                 else:
-                    print(f"  无效选项: {idx}")
+                    print(f"  无效选项: {i}")
                     break
             else:
                 if precs:

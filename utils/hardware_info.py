@@ -31,20 +31,27 @@ def _get_cuda_supported_precisions(cpu_precisions: List[Precision]) -> List[Prec
     try:
         import cupy
         prop = cupy.cuda.runtime.getDeviceProperties(0)
-        compute_cap = (prop.get("major", 7), prop.get("minor", 5))
-        cc = compute_cap[0] * 10 + compute_cap[1]
+        major = prop.get("major", 7)
+        minor = prop.get("minor", 5)
+        cc = major * 10 + minor
     except Exception:
-        return cpu_precisions
+        return [Precision.FP64, Precision.FP32, Precision.FP16, Precision.BF16,
+                Precision.INT64, Precision.INT32, Precision.INT16, Precision.INT8]
 
-    supported = list(cpu_precisions)
+    supported = [Precision.FP64, Precision.FP32]
 
-    for p in Precision:
-        prec_str = p.value.lower()
-        if prec_str in ("fp64", "fp32"):
-            continue
+    if cc >= 53:
+        if _is_cupy_dtype_available("float16"):
+            supported.append(Precision.FP16)
+
+    if cc >= 80:
+        if _is_cupy_dtype_available("bfloat16"):
+            supported.append(Precision.BF16)
+
+    for prec in [Precision.INT64, Precision.INT32, Precision.INT16, Precision.INT8]:
+        prec_str = prec.value.lower()
         if _is_cupy_dtype_available(prec_str):
-            if p not in supported:
-                supported.append(p)
+            supported.append(prec)
 
     return supported
 
