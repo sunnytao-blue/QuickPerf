@@ -16,27 +16,64 @@ CPU/GPU 性能测试工具 — 基于 Python CLI，支持跨后端（CUDA / Open
 - 实时进度条
 - Markdown 报告自动生成
 
-## 环境要求
+## 使用前准备
 
-```
-Python >= 3.9
-```
+### 1. 检查 Python 版本
 
-### CPU 测试（必选）
 ```powershell
+python --version
+```
+
+需要 **Python >= 3.9**。
+
+### 2. 安装依赖库
+
+```powershell
+cd QuickPerf
+
+# 一键安装全部依赖（如果全部都需要）
+pip install -r requirements.txt
+
+# 或根据你的需要选择性安装：
+# 仅 CPU 测试
 pip install numpy py-cpuinfo rich
-```
 
-### NVIDIA GPU 测试
-```powershell
+# NVIDIA GPU 测试
 pip install cupy-cuda12x nvidia-cublas-cu12 nvidia-cuda-runtime-cu12 nvidia-cuda-nvrtc-cu12 nvidia-curand-cu12
+
+# Intel / AMD GPU 测试
+pip install pyopencl
 ```
 
-> 如果你已安装 CUDA Toolkit 12.x 并设置了 `CUDA_PATH`，只需 `pip install cupy-cuda12x` 即可。
+### 3. 检查 GPU 驱动和库（如使用 GPU 测试）
 
-### Intel / AMD GPU 测试
 ```powershell
-pip install pyopencl
+# 检查是否有 GPU 可用
+python -c "from utils.gpu_detect import detect_all_gpus; gpus=detect_all_gpus(); print(f'检测到 {len(gpus)} 块 GPU') if gpus else print('未检测到 GPU')"
+```
+
+**NVIDIA GPU 用户**：
+- 确保已安装 NVIDIA 显卡驱动（`nvidia-smi` 可执行）
+- 如果没有安装完整的 CUDA Toolkit，需额外安装 pip 包：`nvidia-cublas-cu12`、`nvidia-cuda-runtime-cu12`、`nvidia-cuda-nvrtc-cu12`、`nvidia-curand-cu12`（已包含在 `requirements.txt` 中）
+- 如果已安装 CUDA Toolkit 12.x 并设置了 `CUDA_PATH` 环境变量，只需 `pip install cupy-cuda12x`
+
+**Intel / AMD GPU 用户**：
+- Windows/Linux 下需要安装对应驱动（通常已随系统安装）
+- 无需额外配置，`pyopencl` 会自动探测设备
+
+### 4. 验证安装
+
+```powershell
+# 验证程序可正常启动
+python main.py --list
+```
+
+启动后应该看到类似输出：
+```
+检测到 2 块 GPU:
+  [0] NVIDIA CMP 40HX (CUDA)
+  [1] Intel(R) Iris(R) Xe Graphics (OpenCL)
+支持精度: FP64, FP32, FP16, INT64, INT32, INT16, INT8
 ```
 
 ## 使用方法
