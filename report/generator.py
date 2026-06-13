@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from typing import List
 
-from config import CaseResult, RunnerConfig, SystemInfo, TestTarget
+from config import CaseResult, RunnerConfig, SystemInfo, TestTarget, precision_sort_key
 
 
 def _fmt_power(watts: float) -> str:
@@ -143,7 +143,7 @@ class ReportGenerator:
     def _build_single_precision_comparison(results, target_label):
         if not results:
             return []
-        precisions = sorted(set(r.precision for r in results))
+        precisions = sorted(set(r.precision for r in results), key=precision_sort_key)
         if len(precisions) < 2:
             return []
 
@@ -206,7 +206,7 @@ class ReportGenerator:
         if not cpu_results or not gpu_results:
             return []
 
-        precisions = sorted(set(r.precision for r in cpu_results))
+        precisions = sorted(set(r.precision for r in cpu_results), key=precision_sort_key)
         if len(precisions) < 2:
             return []
 

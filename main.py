@@ -4,7 +4,7 @@ import time
 import platform
 from typing import List, Optional
 
-from config import Precision, TestTarget, DurationMode, RunnerConfig, SystemInfo, PRECISION_DISPLAY
+from config import Precision, TestTarget, DurationMode, RunnerConfig, SystemInfo, PRECISION_DISPLAY, precision_sort_key
 from utils.gpu_detect import detect_gpu, get_cpu_info, get_cuda_version
 from utils.hardware_info import get_supported_precisions, format_precision_list
 from benchmark.runner import Runner
@@ -458,7 +458,7 @@ def print_results_summary(results):
 
 
 def _print_single_precision_comparison(results, target_label):
-    precisions = sorted(set(r.precision for r in results))
+    precisions = sorted(set(r.precision for r in results), key=precision_sort_key)
     if len(precisions) < 2:
         return
     cases = sorted(set(r.case_name for r in results))
@@ -485,7 +485,7 @@ def _print_single_precision_comparison(results, target_label):
 def print_precision_comparison(cpu_results, gpu_results):
     if not cpu_results or not gpu_results:
         return
-    precisions = sorted(set(r.precision for r in cpu_results))
+    precisions = sorted(set(r.precision for r in cpu_results), key=precision_sort_key)
     if len(precisions) < 2:
         return
 

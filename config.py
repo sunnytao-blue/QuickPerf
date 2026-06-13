@@ -62,6 +62,12 @@ PRECISION_TO_CPU_DTYPE: Dict[Precision, str] = {
 }
 
 
+def precision_sort_key(prec_value: str) -> int:
+    _order = {"FP64": 0, "FP32": 1, "FP16": 2, "BF16": 3,
+              "INT64": 4, "INT32": 5, "INT16": 6, "INT8": 7}
+    return _order.get(prec_value, 99)
+
+
 @dataclass
 class CaseResult:
     case_name: str
