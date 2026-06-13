@@ -102,6 +102,7 @@ class SystemInfo:
     os_info: str = ""
     cuda_version: Optional[str] = None
     supported_precisions: str = ""
+    gpu_list: list = None
 
 
 @dataclass

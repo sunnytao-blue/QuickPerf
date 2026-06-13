@@ -69,9 +69,14 @@ class ReportGenerator:
         lines.append("| 项目 | 值 |")
         lines.append("|------|-----|")
         lines.append(f"| CPU | {self.system_info.cpu_name} |")
-        if self.system_info.gpu_name:
+        gpu_list = getattr(self.system_info, 'gpu_list', None) or []
+        if len(gpu_list) > 1:
+            for i, (name, backend) in enumerate(gpu_list):
+                lines.append(f"| GPU {i + 1} | {name} ({backend}) |")
+        elif self.system_info.gpu_name:
             lines.append(f"| GPU | {self.system_info.gpu_name} |")
-            lines.append(f"| GPU Backend | {self.system_info.gpu_backend} |")
+            if self.system_info.gpu_backend:
+                lines.append(f"| GPU Backend | {self.system_info.gpu_backend} |")
         if self.system_info.cuda_version:
             lines.append(f"| CUDA Version | {self.system_info.cuda_version} |")
         lines.append(f"| OS | {self.system_info.os_info} |")
@@ -118,17 +123,35 @@ class ReportGenerator:
         if not gpu_results:
             return []
 
+        gpu_names = sorted(set(r.gpu_name for r in gpu_results if r.gpu_name))
+        has_multi = len(gpu_names) > 1
+
         lines = ["## GPU 测试结果", ""]
-        lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
-        lines.append("|------|------|---------|----------|--------|--------|----------|----------|------------------|------|")
-        for r in gpu_results:
-            note = r.note if r.note else "-"
-            lines.append(
-                f"| {r.case_name} | {r.precision} | {r.problem_size} | "
-                f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | "
-                f"{_fmt_power(r.avg_power_watts)} | {_fmt_energy(r.energy_joules, r.avg_power_watts)} | "
-                f"{_fmt_efficiency(r.efficiency_gflops_per_watt)} | {note} |"
-            )
+        if has_multi:
+            lines.append("| 用例 | 精度 | GPU | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
+            lines.append("|------|------|-----|---------|----------|--------|--------|----------|----------|------------------|------|")
+            for r in gpu_results:
+                note = r.note if r.note else "-"
+                lines.append(
+                    f"| {r.case_name} | {r.precision} | {r.gpu_name} | {r.problem_size} | "
+                    f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | "
+                    f"{_fmt_power(r.avg_power_watts)} | {_fmt_energy(r.energy_joules, r.avg_power_watts)} | "
+                    f"{_fmt_efficiency(r.efficiency_gflops_per_watt)} | {note} |"
+                )
+        else:
+            gpu_label = gpu_names[0] if gpu_names else ""
+            title = f"## GPU 测试结果{f' ({gpu_label})' if gpu_label else ''}"
+            lines[0] = title
+            lines.append("| 用例 | 精度 | 问题规模 | 耗时 (s) | GFLOPS | TFLOPS | 功耗 (W) | 能量 (J) | 能效 (GFLOPS/W) | 备注 |")
+            lines.append("|------|------|---------|----------|--------|--------|----------|----------|------------------|------|")
+            for r in gpu_results:
+                note = r.note if r.note else "-"
+                lines.append(
+                    f"| {r.case_name} | {r.precision} | {r.problem_size} | "
+                    f"{r.time_seconds:.4f} | {r.gflops:.2f} | {r.tflops:.4f} | "
+                    f"{_fmt_power(r.avg_power_watts)} | {_fmt_energy(r.energy_joules, r.avg_power_watts)} | "
+                    f"{_fmt_efficiency(r.efficiency_gflops_per_watt)} | {note} |"
+                )
         lines.append("")
         return lines
 

@@ -34,7 +34,7 @@ class SaxpyCase(BenchmarkCase):
         else:
             return {
                 DurationMode.QUICK: 100_000_000,
-                DurationMode.NORMAL: 500_000_000,
+                DurationMode.NORMAL: 200_000_000,
             }[mode]
 
     def run_cpu(self, size: int, precision: Precision) -> float:

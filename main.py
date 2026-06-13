@@ -203,12 +203,14 @@ def main():
     total_time = time.perf_counter() - start_time
 
     gpu_name_str = ", ".join(g.name for g in selected_gpus) if selected_gpus else None
+    gpu_list = [(g.name, g.backend_type.value) for g in selected_gpus] if selected_gpus else []
     system_info = SystemInfo(
         cpu_name=get_cpu_info(),
         gpu_name=gpu_name_str or (all_gpus[0].name if all_gpus else None),
         gpu_backend=selected_gpus[0].backend_type.value if selected_gpus else (all_gpus[0].backend_type.value if all_gpus else None),
         os_info=platform.platform(),
         cuda_version=get_cuda_version() if any(g.backend_type.value == "CUDA" for g in selected_gpus) else None,
+        gpu_list=gpu_list,
     )
 
     from report.generator import ReportGenerator
