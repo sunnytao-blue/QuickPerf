@@ -106,10 +106,13 @@ class Runner:
 
         backend._current_precision = precision
 
-        from utils.power_monitor import PowerMonitorContext
-        with PowerMonitorContext(sample_interval=0.05) as monitor:
-            elapsed = case.run_gpu(size, precision, backend)
-        _, gpu_power = monitor.stop()
+        elapsed = case.run_gpu(size, precision, backend)
+        gpu_power = 0.0
+        if backend.backend_type.value == "CUDA":
+            from utils.power_monitor import PowerMonitorContext
+            with PowerMonitorContext(sample_interval=0.05) as monitor:
+                elapsed = case.run_gpu(size, precision, backend)
+            _, gpu_power = monitor.stop()
 
         flops = case.get_flops(size)
         tflops = (flops / elapsed) / 1e12 if elapsed > 0 else 0.0
